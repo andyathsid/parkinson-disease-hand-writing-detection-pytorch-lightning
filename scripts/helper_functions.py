@@ -166,17 +166,19 @@ def plot_loss_curves(results):
 
 # Pred and plot image function from notebook 04
 # See creation: https://www.learnpytorch.io/04_pytorch_custom_datasets/#113-putting-custom-image-prediction-together-building-a-function
-from typing import List
+from typing import List, Tuple
 import torchvision
+from PIL import Image
+import torchvision.transforms as transforms
 
 
-def pred_and_plot_image(
-    model: torch.nn.Module,
-    image_path: str,
-    class_names: List[str] = None,
-    transform=None,
-    device: torch.device = "cuda" if torch.cuda.is_available() else "cpu",
-):
+def pred_and_plot_image(model: torch.nn.Module,
+                        image_path: str, 
+                        class_names: List[str],
+                        true_class: str = None,
+                        image_size: Tuple[int, int] = (224, 224),
+                        transform: torchvision.transforms = None,
+                        device: torch.device = torch.device('cpu')):
     """Makes a prediction on a target image with a trained model and plots the image.
 
     Args:
@@ -197,15 +199,21 @@ def pred_and_plot_image(
                             device=device)
     """
 
-    # 1. Load in image and convert the tensor values to float32
-    target_image = torchvision.io.read_image(str(image_path)).type(torch.float32)
+    # 2. Open image
+    img = Image.open(image_path)
 
-    # 2. Divide the image pixel values by 255 to get them between [0, 1]
-    target_image = target_image / 255.0
+    # 3. Create transformation for image (if one doesn't exist)
+    if transform is not None:
+        image_transform = transform
+    else:
+        image_transform = transforms.Compose([
+            transforms.Resize(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225]),
+        ])
 
-    # 3. Transform if necessary
-    if transform:
-        target_image = transform(target_image)
+    ### Predict on image ### 
 
     # 4. Make sure the model is on the target device
     model.to(device)
@@ -213,27 +221,27 @@ def pred_and_plot_image(
     # 5. Turn on model evaluation mode and inference mode
     model.eval()
     with torch.inference_mode():
-        # Add an extra dimension to the image
-        target_image = target_image.unsqueeze(dim=0)
+        # 6. Transform and add an extra dimension to image (model requires samples in [batch_size, color_channels, height, width])
+        transformed_image = image_transform(img).unsqueeze(dim=0)
 
-        # Make a prediction on image with an extra dimension and send it to the target device
-        target_image_pred = model(target_image.to(device))
+        # 7. Make a prediction on image with an extra dimension and send it to the target device
+        target_image_pred = model(transformed_image.to(device))
 
-    # 6. Convert logits -> prediction probabilities (using torch.softmax() for multi-class classification)
-    target_image_pred_probs = torch.softmax(target_image_pred, dim=1)
+    # 8. Convert logits -> prediction probabilities (using torch.sigmoid() for binary classification)
+    target_image_pred_probs = torch.sigmoid(target_image_pred)
 
-    # 7. Convert prediction probabilities -> prediction labels
-    target_image_pred_label = torch.argmax(target_image_pred_probs, dim=1)
+    # 9. Convert prediction probabilities -> prediction labels
+    target_image_pred_label = (target_image_pred_probs > 0.5).long()
 
-    # 8. Plot the image alongside the prediction and prediction probability
-    plt.imshow(
-        target_image.squeeze().permute(1, 2, 0)
-    )  # make sure it's the right size for matplotlib
-    if class_names:
-        title = f"Pred: {class_names[target_image_pred_label.cpu()]} | Prob: {target_image_pred_probs.max().cpu():.3f}"
+    # 10. Plot image with predicted label, probability, true class (if provided), and image name
+    plt.imshow(img)
+    if true_class:
+        if class_names[target_image_pred_label] == true_class:
+            plt.title(f"True: {true_class} | Pred: {class_names[target_image_pred_label]} | Prob: {target_image_pred_probs.item():.3f}", color="green")
+        else:
+            plt.title(f"True: {true_class} | Pred: {class_names[target_image_pred_label]} | Prob: {target_image_pred_probs.item():.3f}", color="red")
     else:
-        title = f"Pred: {target_image_pred_label} | Prob: {target_image_pred_probs.max().cpu():.3f}"
-    plt.title(title)
+        plt.title(f"Pred: {class_names[target_image_pred_label]} | Prob: {target_image_pred_probs.item():.3f}")
     plt.axis(False)
 
 def set_seeds(seed: int=42):
