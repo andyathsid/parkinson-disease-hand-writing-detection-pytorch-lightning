@@ -1,0 +1,8 @@
+pyproject.toml
+setup.py
+parkinson_disease_hand_writing_detection.egg-info/PKG-INFO
+parkinson_disease_hand_writing_detection.egg-info/SOURCES.txt
+parkinson_disease_hand_writing_detection.egg-info/dependency_links.txt
+parkinson_disease_hand_writing_detection.egg-info/top_level.txt
+scripts/__init__.py
+scripts/helper_functions.py
