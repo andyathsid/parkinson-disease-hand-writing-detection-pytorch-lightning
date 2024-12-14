@@ -72,7 +72,9 @@ def train(model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
           loss_fn: torch.nn.Module,
           epochs: int,
-          device: torch.device) -> Dict[str, List]:
+          device: torch.device,
+          writer: torch.utils.tensorboard.writer.SummaryWriter # new parameter to take in a writer 
+          ) -> Dict[str, List]:
     """Trains and tests a PyTorch model for binary classification."""
     results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
     all_preds = []
@@ -103,14 +105,24 @@ def train(model: torch.nn.Module,
                            global_step=epoch)
         
         # Track the PyTorch model architecture
-        writer.add_graph(model=model, 
-                         # Pass in an example input
-                         input_to_model=torch.randn(32, 3, 224, 224).to(device))
+        # See if there's a writer, if so, log to it
+        if writer:
+            # Add results to SummaryWriter
+            writer.add_scalars(main_tag="Loss", 
+                               tag_scalar_dict={"train_loss": train_loss,
+                                                "test_loss": test_loss},
+                               global_step=epoch)
+            writer.add_scalars(main_tag="Accuracy", 
+                               tag_scalar_dict={"train_acc": train_acc,
+                                                "test_acc": test_acc}, 
+                               global_step=epoch)
+
+            # Close the writer
+            writer.close()
+        else:
+            pass
         
         all_preds.extend(epoch_preds)
         all_targets.extend(epoch_targets)
-    
-    # Close the writer
-    writer.close()
 
     return results, all_preds, all_targets
