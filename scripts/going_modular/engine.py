@@ -5,6 +5,10 @@ import torch
 
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
+from torch.utils.tensorboard import SummaryWriter
+
+# Create a writer with all default settings
+writer = SummaryWriter(log_dir='../runs')
 
 def train_step(model: torch.nn.Module, 
                dataloader: torch.utils.data.DataLoader, 
@@ -86,7 +90,27 @@ def train(model: torch.nn.Module,
         results["test_loss"].append(test_loss)
         results["test_acc"].append(test_acc)
         
+        # Add loss results to SummaryWriter
+        writer.add_scalars(main_tag="Loss", 
+                            tag_scalar_dict={"train_loss": train_loss,
+                                            "test_loss": test_loss},
+                            global_step=epoch)
+        
+        # Add accuracy results to SummaryWriter
+        writer.add_scalars(main_tag="Accuracy", 
+                           tag_scalar_dict={"train_acc": train_acc,
+                                            "test_acc": test_acc}, 
+                           global_step=epoch)
+        
+        # Track the PyTorch model architecture
+        writer.add_graph(model=model, 
+                         # Pass in an example input
+                         input_to_model=torch.randn(32, 3, 224, 224).to(device))
+        
         all_preds.extend(epoch_preds)
         all_targets.extend(epoch_targets)
+    
+    # Close the writer
+    writer.close()
 
     return results, all_preds, all_targets
